@@ -23,7 +23,7 @@ Developer Memory AI helps developers:
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/AokDesu/dev-memory-ai.git
 cd developer-memory-ai
 
 # Install dependencies
