@@ -33,14 +33,75 @@ npm install
 cp .env.example .env.local
 # Edit .env.local and add your API keys
 
-# Initialize database
-npm run db:init
-
 # Start development server
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## 🤖 AI Provider Configuration
+
+Developer Memory AI supports **multiple AI providers**. Choose the one that fits your needs:
+
+### Option 1: Google Gemini (Recommended - Free Tier Available)
+
+```env
+AI_PROVIDER="gemini"
+GEMINI_API_KEY="AIza..."
+GEMINI_MODEL="gemini-2.0-flash-exp"
+EMBEDDINGS_PROVIDER="local"
+```
+
+**Get API Key**: https://aistudio.google.com/app/apikey
+
+**Models**:
+- `gemini-2.0-flash-exp` - Latest, fastest (recommended)
+- `gemini-1.5-pro` - Most capable
+- `gemini-1.5-flash` - Fast and efficient
+
+**Pricing**: Free tier includes 1,500 requests/day
+
+### Option 2: OpenAI
+
+```env
+AI_PROVIDER="openai"
+OPENAI_API_KEY="sk-..."
+EMBEDDINGS_PROVIDER="openai"
+```
+
+**Get API Key**: https://platform.openai.com/api-keys
+
+**Pricing**: Pay-per-use (~$10-50/month for typical usage)
+
+### Option 3: Ollama (Local - Complete Privacy)
+
+```bash
+# Install Ollama
+curl https://ollama.ai/install.sh | sh
+
+# Pull a model
+ollama pull llama3
+
+# Start Ollama server
+ollama serve
+```
+
+```env
+AI_PROVIDER="ollama"
+OLLAMA_BASE_URL="http://localhost:11434"
+OLLAMA_MODEL="llama3"
+EMBEDDINGS_PROVIDER="local"
+```
+
+**Pricing**: Free (runs on your machine)
+
+### Embeddings Configuration
+
+For semantic search, choose an embeddings provider:
+
+- **`local`** (Recommended): Free, runs in Node.js, no API calls
+- **`gemini`**: Uses Gemini's text-embedding-004 model
+- **`openai`**: Uses OpenAI's text-embedding-3-small
 
 ## 📋 Features
 
@@ -52,6 +113,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 - ✅ **Code Explorer**: Browse files with AI-generated insights
 - ✅ **Repository Summary**: Automatic project overview
 - ✅ **External API**: Integration with Claude Code, Cursor, etc.
+- ✅ **Multi-AI Support**: Gemini, OpenAI, or Ollama
 
 ### Coming Soon
 - [ ] Slack integration
@@ -68,7 +130,7 @@ Next.js 14 (App Router)
 ├── Backend (API Routes)
 ├── RAG Engine (LangChain.js)
 ├── Database (Prisma + SQLite)
-└── AI (OpenAI or Ollama)
+└── AI (Gemini/OpenAI/Ollama)
 ```
 
 ## 📁 Project Structure
@@ -87,6 +149,7 @@ developer-memory-ai/
 │   │   └── explorer/         # Code explorer
 │   ├── lib/                   # Core business logic
 │   │   ├── db.ts             # Prisma client
+│   │   ├── llm.ts            # Multi-provider AI
 │   │   ├── indexer/          # Code indexing
 │   │   ├── rag/              # RAG pipeline
 │   │   └── git/              # Git operations
@@ -108,12 +171,22 @@ Create a `.env.local` file:
 # Database
 DATABASE_URL="file:./dev.db"
 
-# OpenAI (for embeddings and LLM)
+# AI Provider (choose one)
+AI_PROVIDER="gemini" # Options: "gemini", "openai", "ollama"
+
+# Google Gemini
+GEMINI_API_KEY="AIza..."
+GEMINI_MODEL="gemini-2.0-flash-exp"
+
+# OpenAI (optional)
 OPENAI_API_KEY="sk-..."
 
-# Or use Ollama (local)
+# Ollama (optional)
 OLLAMA_BASE_URL="http://localhost:11434"
 OLLAMA_MODEL="llama3"
+
+# Embeddings Provider
+EMBEDDINGS_PROVIDER="local" # Options: "local", "gemini", "openai"
 
 # App Settings
 NEXT_PUBLIC_APP_NAME="Developer Memory AI"
@@ -122,23 +195,6 @@ NEXT_PUBLIC_MAX_FILE_SIZE="10485760"
 # External API
 API_SECRET_KEY="your-secret-key-here"
 ```
-
-### Using Local Models (Ollama)
-
-For complete privacy, use Ollama instead of OpenAI:
-
-```bash
-# Install Ollama
-curl https://ollama.ai/install.sh | sh
-
-# Pull a model
-ollama pull llama3
-
-# Start Ollama server
-ollama serve
-```
-
-Then set `OLLAMA_BASE_URL` in `.env.local`.
 
 ## 📖 Usage
 
@@ -290,13 +346,15 @@ pm2 start npm --name "dev-memory" -- start
 - API keys for external access only
 - Rate limiting on all endpoints
 
-## 💰 Cost
+## 💰 Cost Comparison
 
-- **Development**: Free (local models)
-- **Running**: $0-90/month depending on deployment
-  - Local (Ollama): $0
-  - OpenAI API: ~$10-50/month
-  - Vercel hosting: $0-20/month
+| Provider | Setup | Monthly Cost | Privacy | Speed |
+|----------|-------|--------------|---------|-------|
+| **Gemini** | Easy | $0 (free tier) | Cloud | Fast |
+| **OpenAI** | Easy | $10-50 | Cloud | Fast |
+| **Ollama** | Medium | $0 | Local | Medium |
+
+**Recommendation**: Start with Gemini (free), switch to Ollama for privacy, or OpenAI for best quality.
 
 ## 🤝 Contributing
 
@@ -315,6 +373,7 @@ MIT License - see [LICENSE](./LICENSE) for details
 
 - Built with [Next.js](https://nextjs.org/)
 - Powered by [LangChain.js](https://js.langchain.com/)
+- AI by [Google Gemini](https://ai.google.dev/)
 - UI components from [shadcn/ui](https://ui.shadcn.com/)
 - Database with [Prisma](https://www.prisma.io/)
 
