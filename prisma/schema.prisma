@@ -32,6 +32,8 @@ model File {
   path         String
   language     String?
   linesOfCode  Int?
+  size         Int?
+  contentHash  String?  // SHA-256 hash for incremental indexing
   lastAuthor   String?
   lastModified DateTime?
   
@@ -42,6 +44,7 @@ model File {
   
   @@unique([repositoryId, path])
   @@index([repositoryId])
+  @@index([contentHash])
 }
 
 model CodeChunk {
@@ -106,4 +109,41 @@ model IndexingJob {
   createdAt      DateTime @default(now())
   
   @@index([repositoryId, status])
+}
+
+model SearchHistory {
+  id           String   @id @default(cuid())
+  repositoryId String
+  
+  query        String
+  filters      String?  // JSON string of filters
+  resultCount  Int
+  userId       String?
+  
+  createdAt    DateTime @default(now())
+  
+  @@index([repositoryId, createdAt])
+  @@index([query])
+}
+
+model CodeSymbol {
+  id           String   @id @default(cuid())
+  fileId       String
+  
+  name         String
+  type         String   // 'function', 'class', 'method', 'variable', 'interface', 'type'
+  startLine    Int
+  endLine      Int
+  startColumn  Int
+  endColumn    Int
+  docstring    String?
+  parameters   String?  // JSON array
+  returnType   String?
+  parent       String?  // Parent class/function name
+  
+  createdAt    DateTime @default(now())
+  
+  @@index([fileId])
+  @@index([type])
+  @@index([name])
 }
