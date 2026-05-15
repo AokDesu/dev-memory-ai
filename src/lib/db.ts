@@ -1,12 +1,19 @@
 import { PrismaClient } from '@prisma/client';
+import { PrismaLibSql } from '@prisma/adapter-libsql';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+// Create Prisma adapter with config
+const adapter = new PrismaLibSql({
+  url: process.env.DATABASE_URL || 'file:./prisma/dev.db',
+});
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
+    adapter,
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
   });
 
@@ -16,6 +23,16 @@ if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 async function initDB() {
   try {
     await prisma.$connect();
+
+    // Concurrent readers/writers: WAL + busy_timeout avoids "Operation has timed
+    // out" errors when the dashboard polls while the indexer is writing.
+    try {
+      await prisma.$executeRawUnsafe('PRAGMA journal_mode=WAL');
+      await prisma.$executeRawUnsafe('PRAGMA synchronous=NORMAL');
+      await prisma.$executeRawUnsafe('PRAGMA busy_timeout=15000');
+    } catch (e) {
+      console.warn('PRAGMA setup failed (non-fatal):', e);
+    }
     
     // Check if tables exist
     const tables = await prisma.$queryRaw<Array<{ name: string }>>`
@@ -45,6 +62,8 @@ async function initDB() {
           "path" TEXT NOT NULL,
           "language" TEXT,
           "linesOfCode" INTEGER,
+          "size" INTEGER,
+          "contentHash" TEXT,
           "lastAuthor" TEXT,
           "lastModified" DATETIME,
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -108,12 +127,28 @@ async function initDB() {
       // Create indexes
       await prisma.$executeRaw`CREATE UNIQUE INDEX "File_repositoryId_path_key" ON "File"("repositoryId", "path")`;
       await prisma.$executeRaw`CREATE INDEX "File_repositoryId_idx" ON "File"("repositoryId")`;
+      await prisma.$executeRaw`CREATE INDEX "File_contentHash_idx" ON "File"("contentHash")`;
       await prisma.$executeRaw`CREATE INDEX "CodeChunk_repositoryId_chunkType_idx" ON "CodeChunk"("repositoryId", "chunkType")`;
       await prisma.$executeRaw`CREATE INDEX "CodeChunk_fileId_idx" ON "CodeChunk"("fileId")`;
       await prisma.$executeRaw`CREATE INDEX "Commit_repositoryId_timestamp_idx" ON "Commit"("repositoryId", "timestamp")`;
       await prisma.$executeRaw`CREATE INDEX "IndexingJob_repositoryId_status_idx" ON "IndexingJob"("repositoryId", "status")`;
 
       console.log('✅ Database initialized successfully');
+    }
+
+    // Idempotent migrations for tables created by older versions of initDB
+    const fileCols = await prisma.$queryRaw<Array<{ name: string }>>`
+      PRAGMA table_info(File);
+    `;
+    const fileColNames = fileCols.map((c) => c.name);
+    if (!fileColNames.includes('size')) {
+      await prisma.$executeRawUnsafe('ALTER TABLE File ADD COLUMN size INTEGER');
+    }
+    if (!fileColNames.includes('contentHash')) {
+      await prisma.$executeRawUnsafe('ALTER TABLE File ADD COLUMN contentHash TEXT');
+      await prisma.$executeRawUnsafe(
+        'CREATE INDEX IF NOT EXISTS File_contentHash_idx ON File(contentHash)'
+      );
     }
   } catch (error) {
     console.error('Database initialization error:', error);

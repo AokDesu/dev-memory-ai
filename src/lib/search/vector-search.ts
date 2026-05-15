@@ -8,6 +8,8 @@ export interface SearchResult {
   lineStart: number;
   lineEnd: number;
   language: string | null;
+  chunkType: string;
+  name?: string | null;
   context?: {
     commit?: {
       hash: string;
@@ -158,6 +160,8 @@ export async function searchCodeChunks(
         lineStart: chunk.startLine,
         lineEnd: chunk.endLine,
         language: chunk.file.language,
+        chunkType: chunk.chunkType,
+        name: chunk.name,
         context: commit
           ? {
               commit: {

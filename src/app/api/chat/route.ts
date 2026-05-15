@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { z } from 'zod';
+import { randomUUID } from 'crypto';
 import { queryRAGStream } from '@/lib/rag/rag-chain';
 
 // Request validation schema
@@ -15,7 +16,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const validatedData = chatRequestSchema.parse(body);
 
-    const { projectId, message } = validatedData;
+    const { projectId, message, conversationId } = validatedData;
+    const sessionConversationId = conversationId ?? randomUUID();
 
     // Get RAG response with streaming
     const { stream, sources } = await queryRAGStream(projectId, message);
@@ -58,12 +60,12 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // Send done event with full sources
+          // Send done event matching ChatDoneEvent shape
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: 'done',
-                sources,
+                conversationId: sessionConversationId,
               })}\n\n`
             )
           );

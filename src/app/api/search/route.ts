@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
         lineStart: result.lineStart,
         lineEnd: result.lineEnd,
         language: result.language,
+        chunkType: result.chunkType,
+        name: result.name ?? null,
         context: result.context,
       })),
       totalResults: results.length,

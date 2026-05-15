@@ -1,17 +1,52 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import * as Icons from '@/components/ui/icons';
-import { LoadingSpinner } from '@/components/ui/states';
-import { mockFileTree, mockFileContent } from '@/lib/mock-data';
-import { FileTreeNode } from '@/lib/mock-data/files';
+import { LoadingSpinner, EmptyState } from '@/components/ui/states';
 import { formatBytes } from '@/lib/utils';
+import { apiClient } from '@/lib/api-client';
+import type { FileTreeNode } from '@/types/api';
 
 export default function ExplorerPage() {
+  const params = useParams();
+  const projectId = params.id as string;
+
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [fileContent, setFileContent] = useState<string>(mockFileContent);
-  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set(['src', 'src/app', 'src/components']));
+  const [fileContent, setFileContent] = useState<string>('');
+  const [fileLanguage, setFileLanguage] = useState<string | null>(null);
+  const [fileLines, setFileLines] = useState<number>(0);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const [fileTree, setFileTree] = useState<FileTreeNode[]>([]);
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(
+    new Set(['src', 'src/app', 'src/components'])
+  );
   const [loading, setLoading] = useState(false);
+  const [treeLoading, setTreeLoading] = useState(true);
+  const [treeError, setTreeError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setTreeLoading(true);
+        setTreeError(null);
+        const { tree } = await apiClient.getFileTree(projectId);
+        if (cancelled) return;
+        setFileTree(tree);
+      } catch (err) {
+        if (cancelled) return;
+        setTreeError(err instanceof Error ? err.message : 'Failed to load file tree');
+        setFileTree([]);
+      } finally {
+        if (!cancelled) setTreeLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId]);
 
   const toggleDir = (path: string) => {
     setExpandedDirs((prev) => {
@@ -25,14 +60,24 @@ export default function ExplorerPage() {
     });
   };
 
-  const handleFileClick = (path: string) => {
+  const handleFileClick = async (path: string) => {
     setSelectedFile(path);
     setLoading(true);
-    // Simulate loading file content
-    setTimeout(() => {
-      setFileContent(mockFileContent);
+    setFileError(null);
+    setFileContent('');
+    try {
+      const result = await apiClient.getFileContent(projectId, path);
+      setFileContent(result.content);
+      setFileLanguage(result.language);
+      setFileLines(result.lines);
+    } catch (error) {
+      console.error('Error loading file:', error);
+      setFileError(
+        error instanceof Error ? error.message : 'Failed to load file content'
+      );
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
   const renderFileTree = (nodes: FileTreeNode[], level = 0) => {
@@ -95,7 +140,19 @@ export default function ExplorerPage() {
           <h2 className="text-sm font-semibold text-fg">Files</h2>
         </div>
         <div className="flex-1 overflow-auto p-2">
-          {renderFileTree(mockFileTree)}
+          {treeLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <LoadingSpinner size={24} />
+            </div>
+          ) : treeError ? (
+            <div className="p-4 text-center text-sm text-red-500">{treeError}</div>
+          ) : fileTree.length > 0 ? (
+            renderFileTree(fileTree)
+          ) : (
+            <div className="p-4 text-center text-sm text-fg-muted">
+              No files found. Run indexing first.
+            </div>
+          )}
         </div>
       </div>
 
@@ -110,7 +167,8 @@ export default function ExplorerPage() {
                 <div className="flex-1 min-w-0">
                   <div className="text-sm font-medium text-fg truncate">{selectedFile}</div>
                   <div className="text-xs text-fg-dim">
-                    TypeScript · 234 lines · 4.5 KB
+                    {fileLanguage ?? 'unknown'}
+                    {fileLines > 0 && ` · ${fileLines.toLocaleString()} lines`}
                   </div>
                 </div>
               </div>
@@ -130,6 +188,8 @@ export default function ExplorerPage() {
                 <div className="flex items-center justify-center h-full">
                   <LoadingSpinner size={32} />
                 </div>
+              ) : fileError ? (
+                <div className="p-6 text-sm text-red-500">{fileError}</div>
               ) : (
                 <div className="p-4">
                   <pre className="text-sm font-mono text-fg">

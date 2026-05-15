@@ -156,6 +156,14 @@ export interface ChatMessage {
     lines: [number, number];
   }>;
 }
+export interface ChatConversation {
+  id: string;
+  title: string;
+  group: string;
+  messages: ChatMessage[];
+  createdAt: string;
+}
+
 
 export interface ChatHistoryResponse {
   conversationId: string;
@@ -202,6 +210,11 @@ export interface FileItem {
   language?: string;
   size?: number;
   lastModified?: string;
+}
+
+export interface FileTreeNode extends FileItem {
+  children?: FileTreeNode[];
+  expanded?: boolean;
 }
 
 export interface FileListResponse {

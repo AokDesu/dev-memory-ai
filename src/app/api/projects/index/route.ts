@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { indexRepository } from '@/lib/indexer/file-indexer';
 import { z } from 'zod';
 
 const indexProjectSchema = z.object({
@@ -17,7 +18,9 @@ export async function POST(request: NextRequest) {
       where: { id: projectId },
       include: {
         indexingJobs: {
-          where: { status: 'running' },
+          where: { status: { in: ['pending', 'running'] } },
+          orderBy: { createdAt: 'desc' },
+          take: 1,
         },
       },
     });
@@ -29,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if already indexing
+    // Check if already indexing - return existing job
     if (repository.indexingJobs.length > 0) {
       return NextResponse.json({
         jobId: repository.indexingJobs[0].id,
@@ -38,30 +41,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Create new indexing job
-    const job = await prisma.indexingJob.create({
-      data: {
-        repositoryId: projectId,
-        status: 'pending',
-        progress: 0,
-      },
+    // indexRepository creates + manages its own IndexingJob row.
+    // Start indexing in the background (non-blocking).
+    indexRepository(projectId, repository.path).catch((error) => {
+      console.error('Background indexing error:', error);
     });
-
-    // Update repository status
-    await prisma.repository.update({
-      where: { id: projectId },
-      data: { status: 'indexing' },
-    });
-
-    // TODO: Trigger actual indexing process (Member B will implement)
-    // For now, we just create the job and return
-    // In production, this would trigger a background worker or queue job
-96
- 
 
     return NextResponse.json(
       {
-        jobId: job.id,
         status: 'started',
         message: 'Indexing job created successfully',
       },
