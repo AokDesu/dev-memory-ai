@@ -56,6 +56,8 @@ export async function POST(request: NextRequest) {
     // TODO: Trigger actual indexing process (Member B will implement)
     // For now, we just create the job and return
     // In production, this would trigger a background worker or queue job
+96
+ 
 
     return NextResponse.json(
       {
@@ -81,3 +83,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// Made with Bob
