@@ -203,6 +203,20 @@ export function getRepositoryName(dirPath: string): string {
 }
 
 /**
+ * Parse git remote "origin" URL from .git/config (no child_process)
+ */
+export async function getGitRemote(repoPath: string): Promise<string | null> {
+  try {
+    const configPath = path.join(repoPath, '.git', 'config');
+    const content = await fs.readFile(configPath, 'utf-8');
+    const match = content.match(/\[remote "origin"\][\s\S]*?\n\s*url\s*=\s*(.+)/);
+    return match ? match[1].trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Common file extensions to ignore during indexing
  */
 export const IGNORE_PATTERNS = [

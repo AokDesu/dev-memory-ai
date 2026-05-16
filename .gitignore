@@ -13,12 +13,9 @@
 # testing
 /coverage
 
-# next.js
+# build artifacts
+/dist/
 /.next/
-/out/
-
-# production
-/build
 
 # misc
 .DS_Store
@@ -43,7 +40,12 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
-next-env.d.ts
 
 # uploaded projects
 /uploads
+
+# project-local config (written by memory-dev init)
+.memory-dev.json
+
+# logs
+/logs

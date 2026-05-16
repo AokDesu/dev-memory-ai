@@ -415,6 +415,20 @@ async function indexFile(
 }
 
 /**
+ * Index a single file by relative path — used by the watch command for incremental updates
+ */
+export async function indexSingleFile(
+  repositoryId: string,
+  repoPath: string,
+  relativePath: string
+): Promise<void> {
+  const fullPath = path.join(repoPath, relativePath);
+  const fileInfo = await analyzeFile(fullPath, repoPath);
+  if (!fileInfo) return;
+  await indexFile(fileInfo, repositoryId, repoPath);
+}
+
+/**
  * Index an entire repository
  */
 export async function indexRepository(

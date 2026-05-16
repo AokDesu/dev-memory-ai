@@ -48,6 +48,7 @@ async function initDB() {
           "id" TEXT NOT NULL PRIMARY KEY,
           "path" TEXT NOT NULL UNIQUE,
           "name" TEXT NOT NULL,
+          "gitRemote" TEXT,
           "lastIndexed" DATETIME,
           "status" TEXT NOT NULL DEFAULT 'pending',
           "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -149,6 +150,14 @@ async function initDB() {
       await prisma.$executeRawUnsafe(
         'CREATE INDEX IF NOT EXISTS File_contentHash_idx ON File(contentHash)'
       );
+    }
+
+    const repoCols = await prisma.$queryRaw<Array<{ name: string }>>`
+      PRAGMA table_info(Repository);
+    `;
+    const repoColNames = repoCols.map((c) => c.name);
+    if (!repoColNames.includes('gitRemote')) {
+      await prisma.$executeRawUnsafe('ALTER TABLE Repository ADD COLUMN gitRemote TEXT');
     }
   } catch (error) {
     console.error('Database initialization error:', error);
