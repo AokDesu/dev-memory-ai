@@ -21,8 +21,8 @@ export function getLLM(config?: Partial<LLMConfig>) {
   switch (provider) {
     case 'gemini':
       return new ChatGoogleGenerativeAI({
-        apiKey: process.env.GEMINI_API_KEY,
-        model: config?.model || process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp',
+        apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY,
+        model: config?.model || process.env.GEMINI_MODEL || 'gemini-2.0-flash',
         temperature,
         maxOutputTokens: maxTokens,
       });
@@ -116,8 +116,8 @@ export function getAIProviderInfo() {
   return {
     llm: {
       provider,
-      model: provider === 'gemini' 
-        ? process.env.GEMINI_MODEL || 'gemini-2.0-flash-exp'
+      model: provider === 'gemini'
+        ? process.env.GEMINI_MODEL || 'gemini-1.5-flash'
         : provider === 'openai'
         ? 'gpt-4-turbo-preview'
         : process.env.OLLAMA_MODEL || 'llama3',

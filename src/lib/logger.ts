@@ -1,4 +1,4 @@
-import winston from 'winston';
+import winston, { type Logger } from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import path from 'path';
 
@@ -94,7 +94,7 @@ if (process.env.NODE_ENV === 'production' || process.env.LOG_TO_FILE === 'true')
 }
 
 // Create logger instance
-const logger = winston.createLogger({
+const logger: Logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
   levels,
   format,

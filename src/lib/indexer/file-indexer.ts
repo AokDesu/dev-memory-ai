@@ -26,18 +26,40 @@ export type ProgressCallback = (progress: IndexingProgress) => void;
  * Detect programming language from file extension
  */
 function detectLanguage(filePath: string): string | null {
+  const base = path.basename(filePath);
+  // Filename-based detection (no extension)
+  const filenameMap: Record<string, string> = {
+    Dockerfile: 'dockerfile',
+    'Containerfile': 'dockerfile',
+    Makefile: 'make',
+    GNUmakefile: 'make',
+    Rakefile: 'ruby',
+    Gemfile: 'ruby',
+    'CMakeLists.txt': 'cmake',
+    Procfile: 'procfile',
+    Brewfile: 'ruby',
+  };
+  if (filenameMap[base]) return filenameMap[base];
+
   const ext = path.extname(filePath).toLowerCase();
   const languageMap: Record<string, string> = {
     '.js': 'javascript',
+    '.cjs': 'javascript',
+    '.mjs': 'javascript',
     '.jsx': 'javascript',
     '.ts': 'typescript',
     '.tsx': 'typescript',
     '.py': 'python',
+    '.pyi': 'python',
     '.java': 'java',
     '.cpp': 'cpp',
+    '.cxx': 'cpp',
+    '.cc': 'cpp',
     '.c': 'c',
     '.h': 'c',
+    '.hh': 'cpp',
     '.hpp': 'cpp',
+    '.hxx': 'cpp',
     '.cs': 'csharp',
     '.go': 'go',
     '.rs': 'rust',
@@ -45,24 +67,62 @@ function detectLanguage(filePath: string): string | null {
     '.php': 'php',
     '.swift': 'swift',
     '.kt': 'kotlin',
+    '.kts': 'kotlin',
     '.scala': 'scala',
     '.r': 'r',
     '.m': 'objective-c',
+    '.mm': 'objective-c++',
     '.sql': 'sql',
     '.sh': 'shell',
     '.bash': 'shell',
     '.zsh': 'shell',
+    '.fish': 'shell',
+    '.ps1': 'powershell',
     '.html': 'html',
+    '.htm': 'html',
     '.css': 'css',
     '.scss': 'scss',
     '.sass': 'sass',
     '.less': 'less',
     '.json': 'json',
+    '.jsonc': 'json',
+    '.json5': 'json',
     '.xml': 'xml',
     '.yaml': 'yaml',
     '.yml': 'yaml',
+    '.toml': 'toml',
     '.md': 'markdown',
+    '.mdx': 'markdown',
     '.txt': 'text',
+    '.dart': 'dart',
+    '.vue': 'vue',
+    '.svelte': 'svelte',
+    '.astro': 'astro',
+    '.gradle': 'gradle',
+    '.lua': 'lua',
+    '.proto': 'protobuf',
+    '.tf': 'terraform',
+    '.tfvars': 'terraform',
+    '.hcl': 'hcl',
+    '.ex': 'elixir',
+    '.exs': 'elixir',
+    '.erl': 'erlang',
+    '.clj': 'clojure',
+    '.cljs': 'clojure',
+    '.cljc': 'clojure',
+    '.hs': 'haskell',
+    '.elm': 'elm',
+    '.zig': 'zig',
+    '.nim': 'nim',
+    '.cr': 'crystal',
+    '.dockerfile': 'dockerfile',
+    '.gitignore': 'ignore',
+    '.gitattributes': 'ignore',
+    '.env': 'env',
+    '.ini': 'ini',
+    '.cfg': 'ini',
+    '.conf': 'ini',
+    '.properties': 'properties',
   };
 
   return languageMap[ext] || null;
@@ -72,7 +132,7 @@ function detectLanguage(filePath: string): string | null {
  * Check if file should be indexed
  */
 function shouldIndexFile(filePath: string): boolean {
-  const ignoredDirs = [
+  const ignoredDirs = new Set([
     'node_modules',
     '.git',
     'dist',
@@ -85,15 +145,24 @@ function shouldIndexFile(filePath: string): boolean {
     '__pycache__',
     'venv',
     'env',
-  ];
+    '.dart_tool',
+    '.gradle',
+    '.flutter-plugins',
+    'Pods',
+    'target',
+    'vendor',
+    '.claude',
+    '.turbo',
+    '.cache',
+    'tmp',
+    'uploads',
+  ]);
 
   const ignoredExtensions = [
     '.lock',
     '.log',
     '.tmp',
     '.cache',
-    '.min.js',
-    '.min.css',
     '.map',
     '.woff',
     '.woff2',
@@ -109,16 +178,66 @@ function shouldIndexFile(filePath: string): boolean {
     '.zip',
     '.tar',
     '.gz',
+    '.db',
+    '.sqlite',
+    '.sqlite3',
+    '.so',
+    '.dll',
+    '.exe',
+    '.bin',
+    '.class',
+    '.jar',
+    '.war',
+    '.dylib',
+    '.o',
+    '.a',
+    '.pyc',
+    '.pyo',
+    '.dill',
+    '.traineddata',
+    '.weights',
+    '.h5',
+    '.onnx',
+    '.pt',
+    '.model',
+    '.mp3',
+    '.mp4',
+    '.mov',
+    '.avi',
+    '.mkv',
+    '.wav',
+    '.flac',
+    '.bmp',
+    '.tiff',
+    '.webp',
+    '.heic',
+    '.psd',
   ];
 
-  // Check if path contains ignored directories
-  for (const dir of ignoredDirs) {
-    if (filePath.includes(`${path.sep}${dir}${path.sep}`) || filePath.includes(`/${dir}/`)) {
+  // Any path segment (including the first) matching an ignored dir -> skip
+  const segments = filePath.split(/[\\/]/);
+  for (const seg of segments) {
+    if (ignoredDirs.has(seg)) {
       return false;
     }
   }
 
-  // Check file extension
+  // Compound suffixes path.extname can't catch
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith('.min.js') || lower.endsWith('.min.css')) {
+    return false;
+  }
+  // SQLite sidecars (WAL/shared-memory/journal) created next to *.db files
+  if (
+    lower.endsWith('.db-wal') ||
+    lower.endsWith('.db-shm') ||
+    lower.endsWith('.db-journal') ||
+    lower.endsWith('.sqlite-wal') ||
+    lower.endsWith('.sqlite-shm')
+  ) {
+    return false;
+  }
+
   const ext = path.extname(filePath).toLowerCase();
   if (ignoredExtensions.includes(ext)) {
     return false;
@@ -303,21 +422,22 @@ export async function indexRepository(
   repoPath: string,
   onProgress?: ProgressCallback
 ): Promise<void> {
-  try {
-    // Update repository status
-    await prisma.repository.update({
-      where: { id: repositoryId },
-      data: { status: 'indexing' },
-    });
+  // Update repository status
+  await prisma.repository.update({
+    where: { id: repositoryId },
+    data: { status: 'indexing' },
+  });
 
-    // Create indexing job
-    const job = await prisma.indexingJob.create({
-      data: {
-        repositoryId,
-        status: 'running',
-        startedAt: new Date(),
-      },
-    });
+  // Create indexing job (declared outside try so the catch can update it)
+  const job = await prisma.indexingJob.create({
+    data: {
+      repositoryId,
+      status: 'running',
+      startedAt: new Date(),
+    },
+  });
+
+  try {
 
     // Get all files
     const files = await getAllFiles(repoPath, repoPath);
@@ -388,11 +508,22 @@ export async function indexRepository(
   } catch (error) {
     console.error('Error indexing repository:', error);
 
-    // Mark as failed
+    // Mark repo + job as failed so the UI doesn't show stale "running"
     await prisma.repository.update({
       where: { id: repositoryId },
       data: { status: 'error' },
     });
+
+    await prisma.indexingJob
+      .update({
+        where: { id: job.id },
+        data: {
+          status: 'failed',
+          completedAt: new Date(),
+          error: error instanceof Error ? error.message : String(error),
+        },
+      })
+      .catch(() => {});
 
     throw error;
   }

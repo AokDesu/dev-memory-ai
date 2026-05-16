@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { useParams, usePathname } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useParams, usePathname, useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Topbar } from '@/components/layout/topbar';
 import { CommandPalette } from '@/components/ui/command-palette';
 import { ProjectPicker } from '@/components/ui/project-picker';
 import { useKeyboardShortcut } from '@/hooks/use-keyboard-shortcut';
-import { mockCurrentProject, mockProjects, mockChatConversations, mockFileTree } from '@/lib/mock-data';
+import { apiClient } from '@/lib/api-client';
+import { Project } from '@/types/api';
+import { LoadingPage, EmptyState } from '@/components/ui/states';
+import * as Icons from '@/components/ui/icons';
 
 export default function ProjectLayout({
   children,
@@ -16,8 +19,40 @@ export default function ProjectLayout({
 }) {
   const params = useParams();
   const pathname = usePathname();
+  const router = useRouter();
+  const projectId = params.id as string;
+  
   const [cmdOpen, setCmdOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadProjects();
+  }, [projectId]);
+
+  const loadProjects = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const projects = await apiClient.listProjects();
+      setAllProjects(projects);
+      
+      const current = projects.find(p => p.id === projectId);
+      if (current) {
+        setCurrentProject(current);
+      } else {
+        setError('Project not found');
+      }
+    } catch (err) {
+      console.error('Error loading projects:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Determine current page from pathname
   const getCurrentPage = () => {
@@ -32,11 +67,31 @@ export default function ProjectLayout({
   useKeyboardShortcut({ key: 'k', meta: true }, () => setCmdOpen(true));
   useKeyboardShortcut({ key: '/' }, () => setCmdOpen(true));
 
+  if (loading) {
+    return <LoadingPage message="Loading project..." />;
+  }
+
+  if (error || !currentProject) {
+    return (
+      <div className="min-h-screen bg-bg flex items-center justify-center p-8">
+        <EmptyState
+          icon={<Icons.AlertCircle size={32} />}
+          title="Failed to load project"
+          description={error || 'Project not found'}
+          action={{
+            label: 'Retry',
+            onClick: loadProjects,
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-bg">
       {/* Sidebar */}
       <Sidebar
-        project={mockCurrentProject}
+        project={currentProject}
         onOpenPicker={() => setPickerOpen(true)}
         onOpenCmd={() => setCmdOpen(true)}
       />
@@ -44,7 +99,7 @@ export default function ProjectLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar
-          project={mockCurrentProject}
+          project={currentProject}
           currentPage={getCurrentPage()}
           onOpenCmd={() => setCmdOpen(true)}
         />
@@ -57,20 +112,19 @@ export default function ProjectLayout({
       <CommandPalette
         open={cmdOpen}
         onClose={() => setCmdOpen(false)}
-        project={mockCurrentProject}
-        chats={mockChatConversations}
-        files={mockFileTree}
+        project={currentProject}
+        chats={[]}
+        files={[]}
       />
 
       {/* Project Picker */}
       <ProjectPicker
         open={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        projects={mockProjects}
-        currentId={mockCurrentProject.id}
+        projects={allProjects}
+        currentId={currentProject.id}
         onPick={(id) => {
-          console.log('Switch to project:', id);
-          // TODO: Navigate to new project
+          router.push(`/projects/${id}`);
         }}
       />
     </div>

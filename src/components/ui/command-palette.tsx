@@ -4,9 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import * as Icons from './icons';
-import { Project } from '@/types/api';
-import { ChatConversation } from '@/lib/mock-data/chat';
-import { FileTreeNode } from '@/lib/mock-data/files';
+import { Project, ChatConversation, FileTreeNode } from '@/types/api';
 
 interface CommandPaletteProps {
   open: boolean;

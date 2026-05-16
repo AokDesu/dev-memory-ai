@@ -1,15 +1,20 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useParams } from 'next/navigation';
 import * as Icons from '@/components/ui/icons';
 import { EmptyState, LoadingSpinner } from '@/components/ui/states';
-import { mockCurrentConversation } from '@/lib/mock-data';
-import { ChatMessage } from '@/types/api';
+import { apiClient } from '@/lib/api-client';
+import { ChatMessage, ChatEvent } from '@/types/api';
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<ChatMessage[]>(mockCurrentConversation.messages);
+  const params = useParams();
+  const projectId = params.id as string;
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [streaming, setStreaming] = useState(false);
+  const [currentResponse, setCurrentResponse] = useState('');
+  const [currentSources, setCurrentSources] = useState<Array<{ file: string; lines: [number, number] }>>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -21,7 +26,7 @@ export default function ChatPage() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!input.trim() || streaming) return;
 
     const userMessage: ChatMessage = {
@@ -33,21 +38,78 @@ export default function ChatPage() {
     setMessages((prev) => [...prev, userMessage]);
     setInput('');
     setStreaming(true);
+    setCurrentResponse('');
+    setCurrentSources([]);
 
-    // Simulate streaming response
-    setTimeout(() => {
-      const aiMessage: ChatMessage = {
+    // Locals avoid the stale-closure bug: React state set inside the
+    // `for await` loop isn't visible on subsequent iterations of the same
+    // render, so the persisted message would always be empty.
+    let assembledResponse = '';
+    let assembledSources: Array<{ file: string; lines: [number, number] }> = [];
+
+    try {
+      const stream = apiClient.chatStream({
+        projectId,
+        message: input,
+      });
+
+      for await (const event of stream) {
+        switch (event.type) {
+          case 'thinking':
+            // Just show loading state
+            break;
+          case 'context':
+            if ('sources' in event) {
+              assembledSources = event.sources.map((s) => ({
+                file: s.file,
+                lines: s.lines,
+              }));
+              setCurrentSources(assembledSources);
+            }
+            break;
+          case 'token':
+            if ('content' in event) {
+              assembledResponse += event.content;
+              setCurrentResponse(assembledResponse);
+            }
+            break;
+          case 'done': {
+            const aiMessage: ChatMessage = {
+              role: 'assistant',
+              content: assembledResponse,
+              timestamp: new Date().toISOString(),
+              sources: assembledSources.length > 0 ? assembledSources : undefined,
+            };
+            setMessages((prev) => [...prev, aiMessage]);
+            setCurrentResponse('');
+            setCurrentSources([]);
+            setStreaming(false);
+            break;
+          }
+          case 'error':
+            if ('error' in event) {
+              console.error('Chat error:', event.error);
+              const errorMessage: ChatMessage = {
+                role: 'assistant',
+                content: `Error: ${event.error}`,
+                timestamp: new Date().toISOString(),
+              };
+              setMessages((prev) => [...prev, errorMessage]);
+            }
+            setStreaming(false);
+            break;
+        }
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: ChatMessage = {
         role: 'assistant',
-        content: 'This is a simulated AI response. In production, this would stream tokens from the backend using Server-Sent Events (SSE).',
+        content: `Error: ${error instanceof Error ? error.message : 'Failed to send message'}`,
         timestamp: new Date().toISOString(),
-        sources: [
-          { file: 'src/lib/llm.ts', lines: [45, 78] },
-          { file: 'src/app/api/chat/route.ts', lines: [12, 35] },
-        ],
       };
-      setMessages((prev) => [...prev, aiMessage]);
+      setMessages((prev) => [...prev, errorMessage]);
       setStreaming(false);
-    }, 1500);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -154,10 +216,39 @@ export default function ChatPage() {
               </div>
               <div className="flex-1 max-w-3xl">
                 <div className="rounded-xl p-4 bg-bg-card border border-border">
-                  <div className="flex items-center gap-2">
-                    <LoadingSpinner size={16} />
-                    <span className="text-sm text-fg-muted">Thinking...</span>
-                  </div>
+                  {currentResponse ? (
+                    <>
+                      <div className="text-sm whitespace-pre-wrap">{currentResponse}</div>
+                      {currentSources.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-border space-y-2">
+                          <div className="text-xs font-semibold text-fg-dim uppercase tracking-wider">
+                            Sources
+                          </div>
+                          {currentSources.map((source, i) => (
+                            <div
+                              key={i}
+                              className="flex items-center gap-2 p-2 rounded-lg bg-bg-hover"
+                            >
+                              <Icons.FileText size={14} className="text-fg-muted flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-mono text-fg truncate">
+                                  {source.file}
+                                </div>
+                                <div className="text-xs text-fg-dim">
+                                  Lines {source.lines[0]}-{source.lines[1]}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <LoadingSpinner size={16} />
+                      <span className="text-sm text-fg-muted">Thinking...</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

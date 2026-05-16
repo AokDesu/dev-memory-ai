@@ -1,33 +1,54 @@
 'use client';
 
 import { useState } from 'react';
+import { useParams } from 'next/navigation';
 import * as Icons from '@/components/ui/icons';
 import { EmptyState, LoadingSpinner } from '@/components/ui/states';
-import { mockSearchResults } from '@/lib/mock-data';
+import { apiClient } from '@/lib/api-client';
 import { SearchResult } from '@/types/api';
 import { formatRelativeTime } from '@/lib/utils';
 
 export default function SearchPage() {
+  const params = useParams();
+  const projectId = params.id as string;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [executionTime, setExecutionTime] = useState<number>(0);
 
   // Filters
   const [fileType, setFileType] = useState<string[]>([]);
   const [chunkType, setChunkType] = useState<string[]>([]);
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!query.trim()) return;
     
     setLoading(true);
     setSearched(true);
+    setError(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      setResults(mockSearchResults);
+    try {
+      const startTime = Date.now();
+      const response = await apiClient.search({
+        projectId,
+        query: query.trim(),
+        limit: 20,
+        filters: {
+          fileType: fileType.length > 0 ? fileType : undefined,
+        },
+      });
+      
+      setResults(response.results);
+      setExecutionTime(Date.now() - startTime);
+    } catch (err) {
+      console.error('Search error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to search');
+      setResults([]);
+    } finally {
       setLoading(false);
-    }, 800);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -123,11 +144,23 @@ export default function SearchPage() {
             </div>
           )}
 
-          {searched && !loading && results.length === 0 && (
+          {searched && !loading && results.length === 0 && !error && (
             <EmptyState
               icon={<Icons.Search size={32} />}
               title="No results found"
               description="Try adjusting your search query or filters."
+            />
+          )}
+
+          {error && (
+            <EmptyState
+              icon={<Icons.AlertCircle size={32} />}
+              title="Search failed"
+              description={error}
+              action={{
+                label: 'Retry',
+                onClick: handleSearch,
+              }}
             />
           )}
 
@@ -139,7 +172,7 @@ export default function SearchPage() {
                   Found <span className="font-semibold text-fg">{results.length}</span> results
                 </div>
                 <div className="text-xs text-fg-dim">
-                  Search completed in 234ms
+                  Search completed in {executionTime}ms
                 </div>
               </div>
 

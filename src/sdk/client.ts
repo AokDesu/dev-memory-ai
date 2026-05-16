@@ -118,7 +118,7 @@ export class DeveloperMemoryClient {
    * Start indexing a project
    */
   async indexProject(projectId: string, incremental: boolean = false): Promise<{
-    jobId: string;
+    jobId?: string;
     status: string;
     message: string;
   }> {
