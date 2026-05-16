@@ -54,14 +54,32 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<SummaryData | null>(null);
+  const [indexProgress, setIndexProgress] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    let summaryTimer: ReturnType<typeof setTimeout> | null = null;
+    let statusTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const pollStatus = async () => {
+      try {
+        const status = await apiClient.getProjectStatus(projectId);
+        if (cancelled) return;
+        if (status.status === 'indexing' || status.status === 'pending') {
+          setIndexProgress(status.progress);
+          statusTimer = setTimeout(pollStatus, 1000);
+        }
+      } catch {
+        // status polling is best-effort
+      }
+    };
 
     const tick = async (isFirst: boolean) => {
       try {
-        if (isFirst) setLoading(true);
+        if (isFirst) {
+          setLoading(true);
+          pollStatus();
+        }
         setError(null);
         const data = (await apiClient.getProjectSummary(projectId)) as unknown as SummaryData;
         if (cancelled) return;
@@ -69,7 +87,7 @@ export default function DashboardPage() {
         // Keep polling while the indexer is still working so the dashboard
         // populates as files / commits land in the DB.
         if (data.repository?.status === 'indexing' || data.repository?.status === 'pending') {
-          timer = setTimeout(() => tick(false), 3000);
+          summaryTimer = setTimeout(() => tick(false), 3000);
         }
       } catch (err) {
         if (cancelled) return;
@@ -84,7 +102,8 @@ export default function DashboardPage() {
 
     return () => {
       cancelled = true;
-      if (timer) clearTimeout(timer);
+      if (summaryTimer) clearTimeout(summaryTimer);
+      if (statusTimer) clearTimeout(statusTimer);
     };
   }, [projectId]);
 
@@ -103,7 +122,7 @@ export default function DashboardPage() {
   };
 
   if (loading) {
-    return <LoadingPage message="Loading dashboard..." />;
+    return <LoadingPage message="Loading dashboard..." progress={indexProgress} />;
   }
 
   if (error || !summary) {

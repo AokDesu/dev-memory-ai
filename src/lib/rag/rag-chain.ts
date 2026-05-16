@@ -193,43 +193,42 @@ export async function queryRAGStream(
 /**
  * Generate a summary of the repository
  */
-export async function generateRepositorySummary(
-  repositoryId: string
-): Promise<string> {
-  try {
-    const llm = getLLM({ temperature: 0.3 });
-
-    // Get sample of code chunks to understand the project
-    const sampleChunks = await searchCodeChunks(
-      repositoryId,
-      await getEmbeddings('main entry point configuration setup'),
-      10
-    );
-
-    const context = formatContext(sampleChunks);
-
-    const prompt = `Based on the following code samples from a repository, provide a concise summary of the project:
-
-${context}
-
-Provide a summary that includes:
-1. What the project does (main purpose)
-2. Key technologies and frameworks used
-3. Main components or modules
-4. Architecture overview (if apparent)
-
-Keep the summary concise (3-5 paragraphs).
-
-Summary:`;
-
-    const summary = await llm.invoke(prompt);
-
-    return typeof summary === 'string' ? summary : summary.content.toString();
-  } catch (error) {
-    console.error('Repository summary error:', error);
-    throw new Error(`Failed to generate repository summary: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  }
-}
+// export async function generateRepositorySummary(
+//   repositoryId: string
+// ): Promise<string> {
+//   try {
+//     const llm = getLLM({ temperature: 0.3 });
+//
+//     const sampleChunks = await searchCodeChunks(
+//       repositoryId,
+//       await getEmbeddings('main entry point configuration setup'),
+//       10
+//     );
+//
+//     const context = formatContext(sampleChunks);
+//
+//     const prompt = `Based on the following code samples from a repository, provide a concise summary of the project:
+//
+// ${context}
+//
+// Provide a summary that includes:
+// 1. What the project does (main purpose)
+// 2. Key technologies and frameworks used
+// 3. Main components or modules
+// 4. Architecture overview (if apparent)
+//
+// Keep the summary concise (3-5 paragraphs).
+//
+// Summary:`;
+//
+//     const summary = await llm.invoke(prompt);
+//
+//     return typeof summary === 'string' ? summary : summary.content.toString();
+//   } catch (error) {
+//     console.error('Repository summary error:', error);
+//     throw new Error(`Failed to generate repository summary: ${error instanceof Error ? error.message : 'Unknown error'}`);
+//   }
+// }
 
 /**
  * Answer a question with conversation history

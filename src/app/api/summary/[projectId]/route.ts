@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { generateRepositorySummary } from '@/lib/rag/rag-chain';
-import { createGitParser } from '@/lib/git/parser';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -283,30 +281,12 @@ export async function GET(
       filesChanged: JSON.parse(commit.filesChanged),
     }));
 
-    // Get Git statistics
-    let gitStats = null;
-    try {
-      const gitParser = createGitParser(repository.path);
-      gitStats = await gitParser.getRepositoryStats();
-    } catch (error) {
-      console.error('Error getting git stats:', error);
-    }
-
     // Detect tech stack from manifest files (package.json, pubspec.yaml, etc.)
     let detectedStack: string[] = [];
     try {
       detectedStack = await detectTechStack(repository.path);
     } catch (error) {
       console.error('Error detecting tech stack:', error);
-    }
-
-    // Generate AI summary (optional - may fail if no embeddings or AI not configured)
-    let aiSummary = null;
-    try {
-      aiSummary = await generateRepositorySummary(projectId);
-    } catch (error) {
-      console.error('Error generating AI summary (non-fatal):', error);
-      // Continue without AI summary - it's optional
     }
 
     // Get key files (files with most lines of code) - fetch with all fields needed
@@ -356,8 +336,6 @@ export async function GET(
       keyFiles,
       recentCommits,
       topContributors,
-      gitStats,
-      aiSummary,
     });
   } catch (error) {
     console.error('Summary API error:', error);
