@@ -32,4 +32,29 @@ program.addCommand(watchCmd);
 program.addCommand(statusCmd);
 program.addCommand(mcpCmd);
 
-program.parse();
+// No subcommand → launch TUI dashboard
+const args = process.argv.slice(2);
+if (args.length === 0) {
+  // Suppress lib-level console output that corrupts TUI rendering
+  const origLog = console.log;
+  const origError = console.error;
+  const origWarn = console.warn;
+  console.log = () => {};
+  console.error = () => {};
+  console.warn = () => {};
+  process.env.MEMORY_DEV_TUI = '1';
+
+  const { render, Text } = await import('ink');
+  const { createElement } = await import('react');
+  const { App } = await import('./src/tui/App.js');
+
+  const { waitUntilExit } = render(createElement(App, {}));
+  await waitUntilExit();
+
+  console.log = origLog;
+  console.error = origError;
+  console.warn = origWarn;
+  process.exit(0);
+} else {
+  program.parse();
+}

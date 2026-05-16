@@ -1,13 +1,3 @@
-import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-/**
- * Merge Tailwind CSS classes with clsx
- */
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
 /**
  * Format date to relative time (e.g., "2 hours ago")
  */
