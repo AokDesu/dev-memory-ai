@@ -170,32 +170,29 @@ export class GitParser {
   /**
    * Get repository statistics
    */
-  async getRepositoryStats() {
-    try {
-      const log = await this.git.log({ '--all': null });
-      const status = await this.git.status();
-
-      // Get unique authors
-      const authors = new Set(log.all.map((c: DefaultLogFields) => c.author_name));
-
-      // Get branch info
-      const branches = await this.git.branch();
-
-      return {
-        totalCommits: log.total,
-        totalAuthors: authors.size,
-        currentBranch: branches.current,
-        allBranches: branches.all,
-        isClean: status.isClean(),
-        modified: status.modified.length,
-        created: status.created.length,
-        deleted: status.deleted.length,
-      };
-    } catch (error) {
-      console.error('Error getting repository stats:', error);
-      return null;
-    }
-  }
+  // async getRepositoryStats() {
+  //   try {
+  //     const log = await this.git.log({ '--all': null });
+  //     const status = await this.git.status();
+  //
+  //     const authors = new Set(log.all.map((c: DefaultLogFields) => c.author_name));
+  //     const branches = await this.git.branch();
+  //
+  //     return {
+  //       totalCommits: log.total,
+  //       totalAuthors: authors.size,
+  //       currentBranch: branches.current,
+  //       allBranches: branches.all,
+  //       isClean: status.isClean(),
+  //       modified: status.modified.length,
+  //       created: status.created.length,
+  //       deleted: status.deleted.length,
+  //     };
+  //   } catch (error) {
+  //     console.error('Error getting repository stats:', error);
+  //     return null;
+  //   }
+  // }
 }
 
 /**

@@ -4,6 +4,10 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: 'standalone', // Enable standalone output for Docker
 
+  // @xenova/transformers uses native ONNX binaries that webpack cannot bundle.
+  // Keep them as plain Node.js requires at runtime.
+  serverExternalPackages: ['@xenova/transformers', 'onnxruntime-node'],
+
   // Raise the default 10MB body cap so project zip uploads up to 1 GB succeed.
   // https://nextjs.org/docs/app/api-reference/config/next-config-js/middlewareClientMaxBodySize
   // (Not in the public NextConfig type yet, hence the cast.)

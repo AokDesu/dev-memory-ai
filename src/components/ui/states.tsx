@@ -10,11 +10,24 @@ export function LoadingSpinner({ size = 20 }: { size?: number }) {
   );
 }
 
-export function LoadingPage({ message = 'Loading...' }: { message?: string }) {
+export function LoadingPage({ message = 'Loading...', progress }: { message?: string; progress?: number }) {
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4">
       <LoadingSpinner size={32} />
       <p className="text-sm text-fg-muted">{message}</p>
+      <div className="w-48 h-1 bg-bg-hover rounded-full overflow-hidden">
+        {progress != null ? (
+          <div
+            className="h-full bg-accent rounded-full transition-all duration-500 ease-out"
+            style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+          />
+        ) : (
+          <div className="h-full bg-accent rounded-full animate-[loading-bar_1.4s_ease-in-out_infinite]" />
+        )}
+      </div>
+      {progress != null && (
+        <p className="text-xs text-fg-dim">{Math.round(progress)}%</p>
+      )}
     </div>
   );
 }
