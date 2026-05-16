@@ -411,6 +411,13 @@ export class EmbeddingCache {
   }
 
   /**
+   * Remove only expired embeddings (preserves still-valid 7-day TTL entries).
+   */
+  async cleanup(): Promise<void> {
+    await this.cache.cleanup();
+  }
+
+  /**
    * Get cache statistics
    */
   getStats(): CacheStats {
@@ -463,6 +470,13 @@ export class SearchCache {
   }
 
   /**
+   * Remove only expired search entries.
+   */
+  cleanup(): void {
+    this.cache.cleanup();
+  }
+
+  /**
    * Get cache statistics
    */
   getStats(): CacheStats {
@@ -500,12 +514,8 @@ export function getSearchCache(): SearchCache {
 export function scheduleCacheCleanup(intervalMs: number = 3600000): NodeJS.Timeout {
   return setInterval(async () => {
     try {
-      const embCache = getEmbeddingCache();
-      await embCache.clear();
-      
-      const srchCache = getSearchCache();
-      srchCache.clear();
-      
+      await getEmbeddingCache().cleanup();
+      getSearchCache().cleanup();
       console.log('Cache cleanup completed');
     } catch (error) {
       console.error('Cache cleanup failed:', error);
