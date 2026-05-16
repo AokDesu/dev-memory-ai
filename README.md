@@ -24,14 +24,17 @@ Developer Memory AI helps developers:
 ```bash
 # Clone the repository
 git clone https://github.com/AokDesu/dev-memory-ai.git
-cd developer-memory-ai
+cd dev-memory-ai
 
-# Install dependencies
-npm install
+# Install dependencies (--legacy-peer-deps resolves a LangChain peer conflict)
+npm install --legacy-peer-deps
+
+# Generate Prisma client
+npx prisma generate
 
 # Set up environment variables
-cp .env.example .env.local
-# Edit .env.local and add your API keys
+cp .env.example .env
+# Edit .env and add your API keys (see Configuration section below)
 
 # Start development server
 npm run dev
@@ -46,18 +49,18 @@ Developer Memory AI supports **multiple AI providers**. Choose the one that fits
 ### Option 1: Google Gemini (Recommended - Free Tier Available)
 
 ```env
-AI_PROVIDER="gemini"
-GEMINI_API_KEY="AIza..."
-GEMINI_MODEL="gemini-2.0-flash-exp"
-EMBEDDINGS_PROVIDER="local"
+AI_PROVIDER=gemini
+GOOGLE_API_KEY=AIza...        # or GEMINI_API_KEY — both are recognised
+GEMINI_MODEL=gemini-2.5-flash-lite
+EMBEDDINGS_PROVIDER=local
 ```
 
 **Get API Key**: https://aistudio.google.com/app/apikey
 
 **Models**:
-- `gemini-2.0-flash-exp` - Latest, fastest (recommended)
+- `gemini-2.5-flash-lite` - Fast, cheap (recommended)
+- `gemini-2.0-flash` - Latest generation
 - `gemini-1.5-pro` - Most capable
-- `gemini-1.5-flash` - Fast and efficient
 
 **Pricing**: Free tier includes 1,500 requests/day
 
@@ -99,9 +102,11 @@ EMBEDDINGS_PROVIDER="local"
 
 For semantic search, choose an embeddings provider:
 
-- **`local`** (Recommended): Free, runs in Node.js, no API calls
-- **`gemini`**: Uses Gemini's text-embedding-004 model
-- **`openai`**: Uses OpenAI's text-embedding-3-small
+- **`local`** (default): Free, runs in Node.js via `@xenova/transformers` — no API calls needed. The first indexing run downloads the model (~80 MB) once.
+- **`gemini`**: Uses Gemini's `text-embedding-004` model. Requires `GOOGLE_API_KEY`.
+- **`openai`**: Uses OpenAI's `text-embedding-3-small`. Requires `OPENAI_API_KEY`.
+
+> **Important:** the embeddings provider must be the same for indexing and querying. If you change `EMBEDDINGS_PROVIDER` after indexing, re-index the project so stored vectors match.
 
 ## 📋 Features
 
@@ -125,13 +130,15 @@ For semantic search, choose an embeddings provider:
 ## 🏗️ Architecture
 
 ```
-Next.js 14 (App Router)
+Next.js 16 (App Router, Webpack mode)
 ├── Frontend (React + TailwindCSS)
 ├── Backend (API Routes)
 ├── RAG Engine (LangChain.js)
-├── Database (Prisma + SQLite)
-└── AI (Gemini/OpenAI/Ollama)
+├── Database (Prisma 7 + SQLite via libsql)
+└── AI (Gemini / OpenAI / Ollama)
 ```
+
+> Turbopack is disabled (`next dev --webpack`) because it cannot resolve Prisma's native `.prisma` client. This is handled automatically by the `dev` script.
 
 ## 📁 Project Structure
 
@@ -165,35 +172,33 @@ developer-memory-ai/
 
 ### Environment Variables
 
-Create a `.env.local` file:
+Copy `.env.example` to `.env` and fill in the values:
 
 ```env
 # Database
-DATABASE_URL="file:./dev.db"
+DATABASE_URL="file:./prisma/dev.db"
 
-# AI Provider (choose one)
-AI_PROVIDER="gemini" # Options: "gemini", "openai", "ollama"
+# AI Provider — "gemini" | "openai" | "ollama"
+AI_PROVIDER=gemini
+GOOGLE_API_KEY=AIza...          # or GEMINI_API_KEY
+GEMINI_MODEL=gemini-2.5-flash-lite
 
-# Google Gemini
-GEMINI_API_KEY="AIza..."
-GEMINI_MODEL="gemini-2.0-flash-exp"
+# OpenAI (if AI_PROVIDER=openai)
+OPENAI_API_KEY=sk-...
 
-# OpenAI (optional)
-OPENAI_API_KEY="sk-..."
+# Ollama (if AI_PROVIDER=ollama)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3
 
-# Ollama (optional)
-OLLAMA_BASE_URL="http://localhost:11434"
-OLLAMA_MODEL="llama3"
+# Embeddings — "local" | "gemini" | "openai"
+EMBEDDINGS_PROVIDER=local
 
-# Embeddings Provider
-EMBEDDINGS_PROVIDER="local" # Options: "local", "gemini", "openai"
+# App settings
+NEXT_PUBLIC_MAX_FILE_SIZE=10485760
 
-# App Settings
-NEXT_PUBLIC_APP_NAME="Developer Memory AI"
-NEXT_PUBLIC_MAX_FILE_SIZE="10485760"
-
-# External API
-API_SECRET_KEY="your-secret-key-here"
+# External API authentication (used by /api/external/* endpoints)
+API_SECRET_KEY=your-secret-key-here
+ADMIN_API_KEY=your-admin-key-here
 ```
 
 ## 📖 Usage
@@ -226,30 +231,52 @@ to improve session caching performance..."
 
 Browse the file tree with AI-generated descriptions for each file.
 
-## 🔌 API Integration
+## 🔌 External API
 
-### For AI Tools (Claude Code, Cursor, etc.)
+AI tools (Claude Code, Codex, Bob Shell, etc.) can delegate codebase questions to this webapp instead of reading files themselves. All external endpoints require `Authorization: Bearer <API_SECRET_KEY>`.
 
-```typescript
-// Query the knowledge base
-const response = await fetch('http://localhost:3000/api/external/query', {
-  method: 'POST',
-  headers: {
-    'Authorization': 'Bearer YOUR_API_KEY',
-    'Content-Type': 'application/json',
-  },
-  body: JSON.stringify({
-    projectId: 'proj_123',
-    query: 'Explain the payment flow',
-  }),
-});
+### Discover indexed projects
 
-const data = await response.json();
-console.log(data.answer);
-console.log(data.sources);
+```bash
+GET /api/external/projects
 ```
 
-See [API_CONTRACTS.md](./API_CONTRACTS.md) for full API documentation.
+```json
+{
+  "projects": [
+    { "id": "...", "name": "my-repo", "path": "/home/user/my-repo", "status": "ready", "lastIndexed": "..." }
+  ],
+  "total": 1
+}
+```
+
+### Ask a question
+
+```bash
+POST /api/external/ask
+Content-Type: application/json
+
+{
+  "projectPath": "/home/user/my-repo",   # or projectId / projectName
+  "query": "how does authentication work?",
+  "maxResults": 5
+}
+```
+
+```json
+{
+  "answer": "Authentication is handled by... [Source 1]",
+  "sources": [{ "file": "src/auth.ts", "lines": [12, 45], "content": "...", "relevance": 0.87 }],
+  "project": { "id": "...", "name": "my-repo" },
+  "confidence": 0.72,
+  "executionTime": 2400,
+  "cached": false
+}
+```
+
+Responses are cached for 10 minutes. A repeated identical query returns in ~3 ms with `"cached": true`.
+
+See **[skill.md](./skill.md)** for the full integration guide including error codes and a recommended workflow for AI agents.
 
 ## 🛠️ Development
 
@@ -284,11 +311,7 @@ See [TEAM_TASK_DISTRIBUTION_V2.md](../TEAM_TASK_DISTRIBUTION_V2.md) for detailed
 
 ## 📚 Documentation
 
-- [Technical Plan](../TECHNICAL_PLAN.md) - Original technical approach
-- [Next.js Implementation Plan](../NEXTJS_IMPLEMENTATION_PLAN.md) - Full implementation guide
-- [Application Workflow](../APPLICATION_WORKFLOW.md) - User journey and technical flow
-- [API Contracts](./API_CONTRACTS.md) - Complete API documentation
-- [Team Task Distribution](../TEAM_TASK_DISTRIBUTION_V2.md) - Task breakdown for team
+- [skill.md](./skill.md) — Integration guide for AI agents (Claude Code, Codex, etc.)
 
 ## 🧪 Testing
 
