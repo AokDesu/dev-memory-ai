@@ -21,14 +21,10 @@ export async function register() {
         
         // Set environment
         environment: process.env.NODE_ENV || 'development',
-        
-        // Enable performance monitoring
-        enableTracing: true,
-        
+
         // Integrations
         integrations: [
-          // Prisma integration for database monitoring
-          new Sentry.Integrations.Prisma({ client: undefined }),
+          Sentry.prismaIntegration(),
         ],
         
         // Filter out health check requests

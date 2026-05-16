@@ -226,5 +226,3 @@ export function createClient(config: SDKConfig): DeveloperMemoryClient {
   return new DeveloperMemoryClient(config);
 }
 
-// Export types
-export type { SDKConfig };
