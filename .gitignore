@@ -49,3 +49,9 @@ yarn-error.log*
 
 # logs
 /logs
+
+# local SQLite database
+prisma/*.db
+prisma/*.db-shm
+prisma/*.db-wal
+prisma/*.db-journal

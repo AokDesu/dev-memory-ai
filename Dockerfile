@@ -1,68 +1,47 @@
-# Multi-stage build for Developer Memory AI
+# memory-dev — CLI container
+# Useful for running memory-dev watch or memory-dev mcp as a persistent service.
+# Mount your repo at /repo and set DATABASE_URL to a persistent volume.
+#
+# Example:
+#   docker build -t memory-dev .
+#   docker run -it --rm \
+#     -v /path/to/your/repo:/repo \
+#     -v memory-dev-data:/data \
+#     -e GOOGLE_API_KEY=your_key \
+#     -e DATABASE_URL=file:/data/dev.db \
+#     memory-dev mcp
 
-# Stage 1: Dependencies
+# Stage 1: install dependencies
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Copy package files
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 
-# Install dependencies
 RUN npm ci --legacy-peer-deps
 
-# Stage 2: Builder
-FROM node:20-alpine AS builder
-WORKDIR /app
-
-# Copy dependencies
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-# Set environment variables for build
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
-
-# Generate Prisma client
-RUN npx prisma generate
-
-# Build Next.js application
-RUN npm run build
-
-# Stage 3: Runner
+# Stage 2: runtime image
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+# Non-root user
+RUN addgroup --system --gid 1001 nodejs \
+ && adduser  --system --uid 1001 memorydev
 
-# Copy necessary files
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-# Create data directory for SQLite
-RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
+# Generate Prisma client
+RUN npx prisma generate
 
-# Set user
-USER nextjs
+# Persistent data directory for SQLite
+RUN mkdir -p /data && chown memorydev:nodejs /data
 
-# Expose port
-EXPOSE 3000
+USER memorydev
 
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-ENV DATABASE_URL="file:/app/data/dev.db"
+ENV DATABASE_URL="file:/data/dev.db"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
-
-# Start application
-CMD ["node", "server.js"]
+ENTRYPOINT ["node", "cli.js"]
+CMD ["--help"]

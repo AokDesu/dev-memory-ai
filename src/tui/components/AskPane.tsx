@@ -21,12 +21,22 @@ export function AskPane({ projectId, isFocused, onReleaseFocus }: AskPaneProps) 
         onReleaseFocus();
         return;
       }
-      // Any printable key or enter activates input
       if (!inputActive && (input || key.return)) {
         setInputActive(true);
       }
     },
     { isActive: isFocused && !inputActive }
+  );
+
+  // Catch Escape while typing (TextInput captures keys, this handler stays active)
+  useInput(
+    (_input, key) => {
+      if (key.escape) {
+        setInputActive(false);
+        onReleaseFocus();
+      }
+    },
+    { isActive: isFocused && inputActive }
   );
 
   const handleSubmit = (val: string) => {
@@ -45,7 +55,7 @@ export function AskPane({ projectId, isFocused, onReleaseFocus }: AskPaneProps) 
         <Text color="cyan">&gt; </Text>
         <TextInput
           value={query}
-          onChange={setQuery}
+          onChange={(v) => setQuery(v.split(String.fromCharCode(27)).join(''))}
           onSubmit={handleSubmit}
           focus={isFocused && inputActive}
           placeholder="Ask a question about your codebase…"

@@ -1,6 +1,6 @@
-# dev-memory-ai — Codebase Q&A Skill
+# memory-dev — Codebase Q&A via MCP
 
-Use this skill to answer questions about any indexed repository without loading source files into your context. The webapp performs embedding search and LLM synthesis; you receive a ready answer with cited sources.
+Use this skill to answer questions about any indexed repository without loading source files into context. `memory-dev` performs embedding search and LLM synthesis; you receive a ready answer with cited source locations.
 
 ## When to use
 
@@ -8,115 +8,101 @@ Use this skill to answer questions about any indexed repository without loading 
 - "Where is Y implemented?"
 - "What files are involved in Z?"
 
-Delegate these questions here instead of reading files yourself. Reduces token usage significantly for large codebases.
+Delegate these questions to memory-dev instead of reading files yourself. Reduces token usage significantly for large codebases.
 
 ## Setup
 
-**Base URL:** `http://localhost:3000` (or wherever the webapp is running)  
-**Auth:** every request needs `Authorization: Bearer <API_SECRET_KEY>`  
-The key is in the webapp's `.env` file as `API_SECRET_KEY`.
+Add `.mcp.json` to your project root to enable the tools in Claude Code (or any MCP-compatible assistant):
+
+```json
+{
+  "mcpServers": {
+    "memory-dev": {
+      "command": "memory-dev",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+If running from source instead of a global install:
+```json
+{
+  "mcpServers": {
+    "memory-dev": {
+      "command": "node",
+      "args": ["/path/to/dev-memory-ai/cli.js", "mcp"]
+    }
+  }
+}
+```
+
+Then index the project once: `memory-dev init .`
+
+The MCP server auto-detects the active project via `.memory-dev.json` written by `init`.
 
 ---
 
-## Step 1 — Discover available projects
+## Available tools
 
-```
-GET /api/external/projects
-Authorization: Bearer <key>
+### `memory_ask`
+
+Ask a natural language question. Returns a synthesized answer with source citations.
+
+**Input:**
+```json
+{ "query": "how does authentication work?", "maxResults": 5 }
 ```
 
-**Response**
+**Output:**
+```json
+{
+  "answer": "Authentication is handled by...",
+  "sources": [
+    { "file": "src/lib/auth.ts", "lines": [12, 45], "score": 0.87 }
+  ],
+  "confidence": 0.72
+}
+```
+
+Use `confidence` as a quality signal — below ~0.3 means the codebase has little relevant content for the query.
+
+### `memory_search`
+
+Return raw code chunks by semantic similarity. Useful when you want to inspect the actual code rather than a synthesized answer.
+
+**Input:**
+```json
+{ "query": "database connection pooling", "limit": 10 }
+```
+
+### `memory_projects`
+
+List all indexed projects and their status.
+
+**Output:**
 ```json
 {
   "projects": [
-    {
-      "id": "cmp7xnqo70000dw2rj8zxozqw",
-      "name": "dev-memory-ai",
-      "path": "C:\\Users\\chava\\dev-memory-ai",
-      "status": "ready",
-      "lastIndexed": "2026-05-16T06:02:30.868Z"
-    }
-  ],
-  "total": 1
+    { "id": "...", "name": "my-project", "status": "ready", "lastIndexed": "..." }
+  ]
 }
 ```
 
-Only projects with `"status": "ready"` can be queried. Skip projects that are `"indexing"` or `"error"`.
+Only projects with `"status": "ready"` can be queried.
 
----
+### `memory_file_tree`
 
-## Step 2 — Ask a question
-
-```
-POST /api/external/ask
-Authorization: Bearer <key>
-Content-Type: application/json
-```
-
-**Request body**
-```json
-{
-  "projectPath": "C:\\Users\\chava\\dev-memory-ai",
-  "query": "how does authentication work?",
-  "maxResults": 5
-}
-```
-
-You may identify the project with **any one** of:
-| Field | Description |
-|---|---|
-| `projectId` | The `id` from `/projects` — most precise |
-| `projectPath` | Filesystem path of the repo (exact match) — best for tools that know the working directory |
-| `projectName` | Display name (exact, case-sensitive) |
-
-`maxResults` is optional (default 5, max 20). Higher values give broader context but slower responses.
-
-**Response**
-```json
-{
-  "answer": "Authentication is handled by... [Source 1]",
-  "sources": [
-    {
-      "file": "src/lib/auth.ts",
-      "lines": [12, 45],
-      "content": "...",
-      "relevance": 0.87
-    }
-  ],
-  "project": { "id": "...", "name": "dev-memory-ai" },
-  "confidence": 0.72,
-  "executionTime": 2400,
-  "cached": false
-}
-```
-
-`confidence` is 0–1. Below ~0.3 means the indexed codebase has little relevant content for the query. `cached: true` means the answer came from cache (response will be fast).
-
----
-
-## Errors
-
-| Status | Code | Meaning |
-|---|---|---|
-| 401 | `UNAUTHORIZED` | Missing `Authorization` header |
-| 401 | `INVALID_API_KEY` | Wrong key |
-| 400 | _(zod details)_ | Missing required field or bad `maxResults` |
-| 404 | `PROJECT_NOT_FOUND` | No project matched the identifier |
-| 400 | `PROJECT_NOT_READY` | Project is still indexing |
-| 500 | `INTERNAL_ERROR` | Server-side failure (check `message` field) |
+Show the file tree for the active project. Useful for orientation before asking questions.
 
 ---
 
 ## Recommended workflow
 
 ```
-1. GET /api/external/projects
-     → find the project whose `path` matches the current repo
-     → confirm status === "ready"
-
-2. POST /api/external/ask
-     { projectPath: <repo path>, query: <question> }
-     → read `answer` and cite `sources` if quoting code
+1. memory_projects        → confirm project is indexed and ready
+2. memory_ask             → ask about architecture, logic, or specific behaviour
+3. memory_search          → find relevant code when you need to read the source
 ```
 
-If the webapp is not reachable or the project isn't indexed, fall back to reading files directly.
+If `memory-dev` is not reachable or the project is not indexed, fall back to reading files directly.
