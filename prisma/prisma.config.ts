@@ -1,10 +1,5 @@
-import { defineConfig } from '@prisma/client';
+import { defineConfig } from 'prisma/config';
 
 export default defineConfig({
-  adapter: 'sqlite',
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL || 'file:./prisma/dev.db',
-    },
-  },
+  schema: './prisma/schema.prisma',
 });

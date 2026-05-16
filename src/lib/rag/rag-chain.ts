@@ -142,7 +142,7 @@ export async function queryRAGStream(
   question: string,
   limit: number = 5
 ): Promise<{
-  stream: AsyncIterable<string>;
+  stream: AsyncIterable<{ content: unknown } | string>;
   sources: Array<{
     file: string;
     lines: [number, number];

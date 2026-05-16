@@ -70,7 +70,7 @@ class RepositoryWatcher {
     });
 
     // Error handling
-    this.watcher.on('error', (error: Error) => {
+    this.watcher.on('error', (error: unknown) => {
       console.error('File watcher error:', error);
     });
 
