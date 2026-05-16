@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { metrics } from '@/lib/metrics';
-import { getAllCacheStats } from '@/lib/cache';
+import { getEmbeddingCache, getSearchCache } from '@/lib/cache';
 
 /**
  * Metrics endpoint for monitoring
@@ -8,11 +8,11 @@ import { getAllCacheStats } from '@/lib/cache';
  */
 export async function GET(request: NextRequest) {
   try {
-    // Check for admin authentication (optional)
+    // Require ADMIN_API_KEY — never serve unauthenticated metrics.
     const authHeader = request.headers.get('authorization');
     const adminKey = process.env.ADMIN_API_KEY;
-    
-    if (adminKey && (!authHeader || authHeader !== `Bearer ${adminKey}`)) {
+
+    if (!adminKey || authHeader !== `Bearer ${adminKey}`) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -21,9 +21,12 @@ export async function GET(request: NextRequest) {
 
     // Get performance metrics
     const performanceMetrics = metrics.getSummary();
-    
+
     // Get cache statistics
-    const cacheStats = getAllCacheStats();
+    const cacheStats = {
+      embeddings: getEmbeddingCache().getStats(),
+      search: getSearchCache().getStats(),
+    };
     
     // Get system info
     const memUsage = process.memoryUsage();

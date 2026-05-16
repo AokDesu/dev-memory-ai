@@ -1,7 +1,11 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 
-export async function GET() {
+// Internal route used by the dashboard UI (same-origin fetch from the browser).
+// External AI tools must use /api/external/projects which enforces Bearer auth.
+// Exposed fields include absolute filesystem paths, so do not widen CORS for this
+// route — same-origin policy is the security boundary.
+export async function GET(_request: NextRequest) {
   try {
     const repositories = await prisma.repository.findMany({
       orderBy: {

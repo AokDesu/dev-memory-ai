@@ -58,7 +58,18 @@ export class DeveloperMemoryClient {
 
   constructor(config: SDKConfig) {
     this.apiKey = config.apiKey;
-    this.baseUrl = config.baseUrl || 'http://localhost:3000/api';
+    if (!config.baseUrl) {
+      this.baseUrl = 'http://localhost:3000/api';
+      if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
+        console.warn(
+          '[DeveloperMemoryClient] No baseUrl provided; falling back to ' +
+            'http://localhost:3000/api in a production environment. Set ' +
+            'SDKConfig.baseUrl explicitly to target your deployment.'
+        );
+      }
+    } else {
+      this.baseUrl = config.baseUrl;
+    }
     this.timeout = config.timeout || 30000; // 30 seconds default
   }
 
@@ -78,7 +89,7 @@ export class DeveloperMemoryClient {
    * List all projects
    */
   async listProjects(): Promise<ProjectInfo[]> {
-    const response = await this.fetch('/projects/list', {
+    const response = await this.fetch('/external/projects', {
       method: 'GET',
     });
 

@@ -27,16 +27,19 @@ const nextConfig: NextConfig = {
     },
   },
   
-  // Headers for security
+  // CORS is only applied to the /external/* surface — SDK callers are normally
+  // server/CLI tools (no CORS enforcement), but a wildcard is fine here because
+  // the routes require a Bearer API key. Internal routes (UI/dashboard) stay
+  // same-origin-only by default, which is the security boundary for paths and
+  // other sensitive fields they expose.
   async headers() {
     return [
       {
-        source: '/api/:path*',
+        source: '/api/external/:path*',
         headers: [
-          { key: 'Access-Control-Allow-Credentials', value: 'true' },
           { key: 'Access-Control-Allow-Origin', value: '*' },
-          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,PUT,DELETE,OPTIONS' },
-          { key: 'Access-Control-Allow-Headers', value: 'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization' },
+          { key: 'Access-Control-Allow-Methods', value: 'GET,POST,OPTIONS' },
+          { key: 'Access-Control-Allow-Headers', value: 'Content-Type, Authorization' },
         ],
       },
     ];

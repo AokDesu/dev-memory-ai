@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getLLM, getEmbeddings } from '@/lib/llm';
-import { searchCache, getSearchCacheKey } from '@/lib/cache';
+import { getSearchCache } from '@/lib/cache';
 import { z } from 'zod';
 
 const querySchema = z.object({
@@ -61,9 +61,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check cache
-    const cacheKey = getSearchCacheKey(projectId, query);
-    const cachedResult = searchCache.get(cacheKey);
+    // Check cache — key includes projectId so different projects never share entries
+    const cache = getSearchCache();
+    const cacheFilters = { projectId };
+    const cachedResult = cache.get(query, cacheFilters);
     if (cachedResult) {
       return NextResponse.json({
         ...cachedResult,
@@ -88,10 +89,17 @@ export async function POST(request: NextRequest) {
     const scoredChunks = allChunks
       .map(chunk => {
         if (!chunk.embedding) return null;
-        
-        const chunkEmbedding = JSON.parse(chunk.embedding);
+
+        let chunkEmbedding: number[];
+        try {
+          chunkEmbedding = JSON.parse(chunk.embedding);
+        } catch {
+          return null;
+        }
+        if (!Array.isArray(chunkEmbedding)) return null;
+
         const similarity = cosineSimilarity(queryEmbedding, chunkEmbedding);
-        
+
         return {
           chunk,
           similarity,
@@ -128,7 +136,10 @@ Provide a clear, concise answer based on the code context above. Always cite the
     const answer = typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 
     // Calculate confidence based on relevance scores
-    const avgRelevance = sources.reduce((sum, s) => sum + s.relevance, 0) / sources.length;
+    const avgRelevance =
+      sources.length > 0
+        ? sources.reduce((sum, s) => sum + s.relevance, 0) / sources.length
+        : 0;
     const confidence = Math.min(avgRelevance * 1.2, 1); // Scale up slightly, cap at 1
 
     const result = {
@@ -139,7 +150,7 @@ Provide a clear, concise answer based on the code context above. Always cite the
     };
 
     // Cache the result
-    searchCache.set(cacheKey, result);
+    cache.set(query, result, cacheFilters);
 
     return NextResponse.json(result);
   } catch (error) {

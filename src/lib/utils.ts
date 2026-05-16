@@ -52,10 +52,12 @@ export function getFileExtension(path: string): string {
 }
 
 /**
- * Get file name from path
+ * Get file name from path. Splits on both POSIX and Windows separators since
+ * this runs in the browser (where node:path is unavailable) against paths that
+ * may be Windows-formatted (project runs on win32).
  */
 export function getFileName(path: string): string {
-  return path.split('/').pop() || path;
+  return path.split(/[\\/]/).pop() || path;
 }
 
 /**

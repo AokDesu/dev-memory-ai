@@ -104,9 +104,14 @@ class RepositoryWatcher {
     }
 
     // Set new debounce timer
-    const timer = setTimeout(() => {
-      this.processFileChange(type, filePath);
-      this.debounceTimers.delete(filePath);
+    const timer = setTimeout(async () => {
+      try {
+        await this.processFileChange(type, filePath);
+      } catch (error) {
+        console.error('processFileChange failed:', error);
+      } finally {
+        this.debounceTimers.delete(filePath);
+      }
     }, this.DEBOUNCE_MS);
 
     this.debounceTimers.set(filePath, timer);
