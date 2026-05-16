@@ -128,8 +128,9 @@ interface FileIconProps {
 }
 
 export function FileIcon({ ext, size = 14, className = '' }: FileIconProps) {
-  const color = FILE_COLORS[ext.toLowerCase()] || '#888';
-  
+  const safeExt = ext ?? '';
+  const color = FILE_COLORS[safeExt.toLowerCase()] || '#888';
+
   return (
     <div
       className={`inline-flex items-center justify-center ${className}`}
@@ -144,7 +145,7 @@ export function FileIcon({ ext, size = 14, className = '' }: FileIconProps) {
         fontFamily: 'var(--font-mono)',
       }}
     >
-      {ext.slice(0, 2).toUpperCase()}
+      {safeExt.slice(0, 2).toUpperCase()}
     </div>
   );
 }
