@@ -96,7 +96,7 @@ export function isAIConfigured(): boolean {
   
   switch (provider) {
     case 'gemini':
-      return !!process.env.GEMINI_API_KEY;
+      return !!(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY);
     case 'openai':
       return !!process.env.OPENAI_API_KEY;
     case 'ollama':
